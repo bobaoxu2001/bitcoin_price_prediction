@@ -1,18 +1,17 @@
 """
 LightGBM Model for Bitcoin Price Prediction
 
-This module implements the LightGBM (Light Gradient Boosting Machine) model
-for Bitcoin price forecasting. LightGBM uses histogram-based algorithms for
-faster training and lower memory usage compared to traditional GBDT methods.
+Baseline model: Another gradient-boosting framework optimized for speed and
+memory efficiency, LightGBM leverages histogram-based algorithms and provides
+feature importance scores for model interpretability.
 
-Key Features:
-- Leaf-wise tree growth (faster convergence)
-- Histogram-based splitting (efficient memory usage)
-- Native support for categorical features
-- Excellent handling of large datasets
+Also used for feature selection (Section 4) alongside XGBoost to identify
+key predictors via gain-based metrics.
+
+Report Results: MAE 254.37, MSE 258,918.80
 
 Authors: Sam Lai, Zexuan Yang, Yichao Yang, Ao Xu
-Group 36 - Capstone Project
+Group 36 - NYU Capstone Project
 Date: 2024
 """
 

@@ -1,17 +1,23 @@
 """
 ARIMA Model for Bitcoin Price Prediction
 
-This module implements the ARIMA (AutoRegressive Integrated Moving Average) model
-for time series forecasting of Bitcoin prices. ARIMA is a classical statistical
-approach that combines autoregression, differencing, and moving average components.
+Baseline model: A classical statistical model designed for modeling and
+forecasting stationary time series by capturing dependencies between
+observations at different time lags.
+
+Based on ACF/PACF analysis (Section 3 of the report), the combination of
+slow ACF decay and sharp PACF cutoff at lag 1 suggests ARIMA(1,1,1) as a
+reasonable baseline, though auto_arima is used for automatic order selection.
 
 Model Components:
 - AR (AutoRegressive): Uses past values to predict future values
 - I (Integrated): Differencing to achieve stationarity
 - MA (Moving Average): Uses past forecast errors
 
+Report Results: MAE 1602.19, MSE 4,847,913.23
+
 Authors: Sam Lai, Zexuan Yang, Yichao Yang, Ao Xu
-Group 36 - Capstone Project
+Group 36 - NYU Capstone Project
 Date: 2024
 """
 

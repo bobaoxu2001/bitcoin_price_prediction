@@ -1,14 +1,23 @@
 """
 Run All Models and Generate Report Figures
 
-This script runs all implemented models on the Bitcoin price prediction task
+This script runs all 8 implemented models on the Bitcoin price prediction task
 and generates comprehensive visualizations for the capstone report.
+
+Models:
+  Baseline:  ARIMA, XGBoost, LightGBM
+  Proposed:  SE-GRN, iTransformer, Times-FM, SOFTS, CNN-LSTM
+
+Training setup (from the paper):
+  - Training data: 62,809 time points (prior to 2024-01-01)
+  - Prediction horizon: next 100 time steps
+  - Sequence length: 100 hours for deep learning models
 
 Usage:
     python run_all_models.py
 
 Authors: Sam Lai, Zexuan Yang, Yichao Yang, Ao Xu
-Group 36 - Capstone Project
+Group 36 - NYU Capstone Project
 Date: 2024
 """
 

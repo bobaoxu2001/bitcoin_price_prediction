@@ -1,22 +1,21 @@
 """
 iTransformer Model for Bitcoin Price Prediction
 
-This module implements the iTransformer (Inverted Transformer) architecture
-for multivariate time series forecasting. Unlike traditional Transformers
-that apply attention across time, iTransformer applies attention across
-variables/features, treating each feature as a token.
-
-Key Innovations:
-- Feature-wise attention instead of time-wise attention
-- Better capture of multivariate correlations
-- Efficient for high-dimensional time series
+Proposed model: A state-of-the-art time-series forecasting model that
+restructures Transformers by embedding each time point as an independent
+variable token. Designed to improve multivariate correlation modeling and
+capture complex temporal dynamics for both short-term and long-term predictions.
+Enhances sequence representation learning through a feed-forward network
+while maintaining computational efficiency.
 
 Reference:
     Liu et al., "iTransformer: Inverted Transformers Are Effective for
-    Time Series Forecasting" (2023)
+    Time Series Forecasting" (arXiv:2310.06625, 2023)
+
+Report Results: MAE 1948.00, MSE 8,123,500.00
 
 Authors: Sam Lai, Zexuan Yang, Yichao Yang, Ao Xu
-Group 36 - Capstone Project
+Group 36 - NYU Capstone Project
 Date: 2024
 """
 
