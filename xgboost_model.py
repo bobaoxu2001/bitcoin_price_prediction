@@ -1,18 +1,17 @@
 """
 XGBoost Model for Bitcoin Price Prediction
 
-This module implements the XGBoost (eXtreme Gradient Boosting) model for
-Bitcoin price forecasting. XGBoost is an optimized gradient boosting library
-designed for speed and performance.
+Baseline model: A gradient-boosting framework that uses decision trees to
+model complex relationships in time-series data. Known for its efficiency
+and scalability, XGBoost is well-suited for predictive modeling tasks.
 
-Key Features:
-- Regularized learning to prevent overfitting
-- Parallel tree building for efficiency
-- Built-in handling of missing values
-- Feature importance analysis
+Also used for feature selection (Section 4) via gain-based importance metrics
+to identify the most influential predictors.
+
+Report Results: MAE 258.53, MSE 271,929.61
 
 Authors: Sam Lai, Zexuan Yang, Yichao Yang, Ao Xu
-Group 36 - Capstone Project
+Group 36 - NYU Capstone Project
 Date: 2024
 """
 

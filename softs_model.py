@@ -1,22 +1,22 @@
 """
 SOFTS Model for Bitcoin Price Prediction
 
-This module implements the SOFTS (Series-cOre Fused Time Series) model
-for multivariate time series forecasting. SOFTS introduces a novel
-Series-Core Fusion mechanism that efficiently captures both global
-and local temporal patterns.
+Proposed model: Designed for efficient and accurate multivariate time-series
+forecasting. Employs a series-core fusion mechanism to model inter-series
+relationships effectively. Optimized to capture both long-term trends and
+short-term variations, balancing efficiency and accuracy.
 
-Key Components:
-- Series-Core Fusion: Captures cross-series dependencies efficiently
-- Temporal Convolution: Extracts local temporal patterns
-- Adaptive Feature Aggregation: Dynamic weighting of features
+SOFTS demonstrated superior predictive accuracy and stability in this study,
+outperforming all baseline and advanced deep learning models.
 
 Reference:
     Han et al., "SOFTS: Efficient Multivariate Time Series Forecasting
-    with Series-Core Fusion" (2024)
+    with Series-Core Fusion" (NeurIPS 2024)
+
+Report Results: MAE 304.23, MSE 183,679.47 (BEST among proposed models)
 
 Authors: Sam Lai, Zexuan Yang, Yichao Yang, Ao Xu
-Group 36 - Capstone Project
+Group 36 - NYU Capstone Project
 Date: 2024
 """
 

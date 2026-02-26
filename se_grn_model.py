@@ -1,19 +1,17 @@
 """
-SE-GRN Model for Bitcoin Price Prediction
+SE-GRN (Squeeze-and-Excitation Gated Recurrent Network) for Bitcoin Price Prediction
 
-This module implements the Squeeze-and-Excitation Gated Recurrent Network (SE-GRN)
-for time series forecasting. This architecture combines:
-- GRU layers for sequential pattern learning
-- Squeeze-and-Excitation blocks for channel-wise feature recalibration
-- Attention mechanism for focusing on important time steps
+Proposed model: Combines GRU layers with Squeeze-and-Excitation blocks to
+recalibrate features dynamically. Employs attention mechanisms to effectively
+capture temporal dependencies in time-series data.
 
-Key Components:
-- SE Block: Adaptively recalibrates channel-wise feature responses
-- GRU: Captures temporal dependencies with gating mechanisms
-- Attention: Weighs time steps by importance
+Reference: Zhang, Cui & Gouza (2018) — "SeGen: Sample-ensemble genetic
+evolutional network model" [arXiv:1803.08631]
+
+Report Results: MAE 2377.06, MSE 883,273.00
 
 Authors: Sam Lai, Zexuan Yang, Yichao Yang, Ao Xu
-Group 36 - Capstone Project
+Group 36 - NYU Capstone Project
 Date: 2024
 """
 

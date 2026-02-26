@@ -4,13 +4,20 @@ Data Preprocessing Module for Bitcoin Price Prediction
 This module provides comprehensive data loading, cleaning, and preprocessing
 utilities for time series forecasting with multimodal financial data.
 
-Features:
-- Bitcoin hourly price data
-- NASDAQ, Gold, VIX market indicators (daily -> hourly alignment)
+Dataset (Section 2 of the report):
+- Bitcoin hourly closing prices (2016-11-01 to 2024-08-22)
+- NASDAQ, Gold, VIX market indicators (daily → hourly via forward-fill)
 - Social media sentiment scores (Twitter, Reddit, Bitcointalk)
+- Engineered features: moving averages, lag features, returns
+
+Preprocessing (Section 2.2):
+- Daily-to-hourly alignment via forward filling
+- Missing data: backward fill for weekends, forward fill for MA gaps
+- StandardScaler normalization for features and targets
+- Chronological train/test split to prevent data leakage
 
 Authors: Sam Lai, Zexuan Yang, Yichao Yang, Ao Xu
-Group 36 - Capstone Project
+Group 36 - NYU Capstone Project
 Date: 2024
 """
 

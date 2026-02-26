@@ -1,22 +1,26 @@
 """
-CNN-LSTM Hybrid Model for Bitcoin Price Prediction
+CNN-LSTM (Convolutional Neural Network - Long Short-Term Memory) for Bitcoin Price Prediction
 
-This module implements a CNN-LSTM hybrid architecture that combines:
-- CNN layers for feature extraction from local temporal patterns
-- LSTM layers for capturing long-term temporal dependencies
-
-The CNN acts as a feature extractor, learning hierarchical representations
-from the input time series, while the LSTM captures sequential patterns
-and long-range dependencies essential for accurate forecasting.
+Proposed model: Integrates convolutional layers for feature extraction from
+raw time-series data (identifying patterns and trends in historical prices)
+with LSTM layers to capture temporal dependencies and long-term sequences.
+Combines the strengths of CNNs and LSTMs to address the challenges of
+volatility and trend variations in Bitcoin price prediction.
 
 Architecture:
-1. Conv1D layers with batch normalization and pooling
+1. Multi-scale Conv1D layers with batch normalization
 2. Bidirectional LSTM layers
-3. Attention mechanism for temporal focus
+3. Temporal attention mechanism
 4. Dense prediction head
 
+Reference:
+    Shi et al. (2015) — "Convolutional LSTM Network: A Machine Learning
+    Approach for Precipitation Nowcasting" (NeurIPS 2015)
+
+Report Results: MAE 1941.32, MSE 6,730,000.00
+
 Authors: Sam Lai, Zexuan Yang, Yichao Yang, Ao Xu
-Group 36 - Capstone Project
+Group 36 - NYU Capstone Project
 Date: 2024
 """
 

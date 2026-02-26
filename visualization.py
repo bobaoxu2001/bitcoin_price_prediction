@@ -2,20 +2,26 @@
 Visualization Module for Bitcoin Price Prediction
 
 This module provides comprehensive visualization functions for reproducing
-all figures in the capstone report, including:
-- Full timeline predictions
-- Period-specific analysis (7 days, 30 days, 2024 onwards)
-- Error distribution
-- Returns comparison
-- Model comparison charts
-- Feature importance plots
+all figures in the capstone report (Section 6.1), including:
+  1. Full timeline prediction — complete prediction period
+  2. Single prediction window — short-term accuracy
+  3. Time series validation windows — robustness trends
+  4. Returns comparison — actual vs predicted daily returns
+  5. Distribution of prediction errors — error variability
+  6. Timeline of error percentages — error fluctuation over time
+  7. Model comparison charts
+  8. Feature importance plots
+  9. Training curves
 
 Authors: Sam Lai, Zexuan Yang, Yichao Yang, Ao Xu
+Group 36 - NYU Capstone Project
 Date: 2024
 """
 
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from typing import Dict, List, Optional, Tuple
@@ -72,7 +78,7 @@ def plot_full_timeline(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Figure saved to {save_path}")
     
-    plt.show()
+    plt.close()
 
 
 def plot_last_n_days(
@@ -121,7 +127,7 @@ def plot_last_n_days(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Figure saved to {save_path}")
     
-    plt.show()
+    plt.close()
 
 
 def plot_from_2024(
@@ -177,7 +183,7 @@ def plot_from_2024(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Figure saved to {save_path}")
     
-    plt.show()
+    plt.close()
 
 
 def plot_error_distribution(
@@ -216,7 +222,7 @@ def plot_error_distribution(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Figure saved to {save_path}")
     
-    plt.show()
+    plt.close()
 
 
 def plot_returns_comparison(
@@ -264,7 +270,186 @@ def plot_returns_comparison(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Figure saved to {save_path}")
     
-    plt.show()
+    plt.close()
+
+
+def plot_prediction_window(
+    dates: np.ndarray,
+    actuals: np.ndarray,
+    predictions: np.ndarray,
+    window_size: int = 100,
+    model_name: str = 'Model',
+    save_path: Optional[str] = None
+) -> None:
+    """
+    Plot a single prediction window (Section 6.1 — Component 2).
+
+    Focuses on the model's recent short-term accuracy over the specified
+    number of time steps.
+
+    Args:
+        dates: Array of datetime values
+        actuals: Actual price values
+        predictions: Predicted price values
+        window_size: Number of time steps in the window
+        model_name: Name of the model
+        save_path: Path to save figure
+    """
+    n = min(window_size, len(actuals))
+
+    dates_w = pd.to_datetime(dates[-n:])
+    actuals_w = actuals[-n:]
+    preds_w = predictions[-n:]
+
+    fig, axes = plt.subplots(2, 1, figsize=(14, 8), gridspec_kw={'height_ratios': [3, 1]})
+
+    axes[0].plot(dates_w, actuals_w, label='Actual', color='blue', linewidth=1.5)
+    axes[0].plot(dates_w, preds_w, label='Predicted', color='orange', linewidth=1.5)
+    axes[0].fill_between(dates_w, actuals_w, preds_w, alpha=0.15, color='orange')
+    axes[0].set_title(f'{model_name} — Single Prediction Window (last {n} steps)',
+                      fontsize=14, fontweight='bold')
+    axes[0].set_ylabel('Price (USD)')
+    axes[0].legend()
+    axes[0].grid(alpha=0.3)
+
+    error = preds_w - actuals_w
+    axes[1].bar(dates_w, error, color=np.where(error >= 0, 'green', 'red'), alpha=0.7, width=0.03)
+    axes[1].axhline(y=0, color='black', linewidth=0.5)
+    axes[1].set_title('Prediction Error', fontsize=12)
+    axes[1].set_xlabel('Date')
+    axes[1].set_ylabel('Error (USD)')
+    axes[1].grid(alpha=0.3)
+
+    for ax in axes:
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+
+    fig.autofmt_xdate()
+    plt.tight_layout()
+
+    if save_path:
+        fig.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Figure saved to {save_path}")
+
+    plt.close(fig)
+
+
+def plot_validation_windows(
+    dates: np.ndarray,
+    actuals: np.ndarray,
+    predictions: np.ndarray,
+    n_windows: int = 4,
+    window_size: int = 100,
+    model_name: str = 'Model',
+    save_path: Optional[str] = None
+) -> None:
+    """
+    Plot multiple time series validation windows (Section 6.1 — Component 3).
+
+    Showcases robustness of performance trends across different time windows.
+
+    Args:
+        dates: Array of datetime values
+        actuals: Actual price values
+        predictions: Predicted price values
+        n_windows: Number of validation windows to display
+        window_size: Size of each window
+        model_name: Name of the model
+        save_path: Path to save figure
+    """
+    total = len(actuals)
+    if total < n_windows * window_size:
+        window_size = max(total // n_windows, 10)
+
+    step = max((total - window_size) // max(n_windows - 1, 1), 1)
+
+    fig, axes = plt.subplots(n_windows, 1, figsize=(14, 3 * n_windows), sharex=False)
+    if n_windows == 1:
+        axes = [axes]
+
+    for i in range(n_windows):
+        start = i * step
+        end = min(start + window_size, total)
+
+        d = pd.to_datetime(dates[start:end])
+        a = actuals[start:end]
+        p = predictions[start:end]
+
+        mae = np.mean(np.abs(a - p))
+
+        axes[i].plot(d, a, label='Actual', color='blue', linewidth=1.2)
+        axes[i].plot(d, p, label='Predicted', color='orange', linewidth=1.2)
+        axes[i].fill_between(d, a, p, alpha=0.1, color='orange')
+        axes[i].set_title(f'Window {i+1} (MAE: {mae:.2f})', fontsize=11, fontweight='bold')
+        axes[i].set_ylabel('Price')
+        axes[i].legend(loc='upper right', fontsize=8)
+        axes[i].grid(alpha=0.3)
+        axes[i].xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+
+    fig.suptitle(f'{model_name} — Time Series Validation Windows',
+                 fontsize=14, fontweight='bold', y=1.01)
+    fig.autofmt_xdate()
+    plt.tight_layout()
+
+    if save_path:
+        fig.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Figure saved to {save_path}")
+
+    plt.close(fig)
+
+
+def plot_error_percentage_timeline(
+    dates: np.ndarray,
+    actuals: np.ndarray,
+    predictions: np.ndarray,
+    model_name: str = 'Model',
+    save_path: Optional[str] = None
+) -> None:
+    """
+    Plot timeline of error percentages (Section 6.1 — Component 6).
+
+    Depicts the fluctuation of percentage errors over time.
+
+    Args:
+        dates: Array of datetime values
+        actuals: Actual price values
+        predictions: Predicted price values
+        model_name: Name of the model
+        save_path: Path to save figure
+    """
+    dates_dt = pd.to_datetime(dates)
+
+    non_zero = actuals != 0
+    error_pct = np.zeros_like(actuals, dtype=float)
+    error_pct[non_zero] = np.abs((predictions[non_zero] - actuals[non_zero]) / actuals[non_zero]) * 100
+
+    fig, ax = plt.subplots(figsize=(14, 5))
+    ax.plot(dates_dt, error_pct, color='steelblue', linewidth=0.8, alpha=0.7)
+
+    # Rolling average
+    window = min(24, len(error_pct) // 5)
+    if window > 1:
+        rolling_avg = pd.Series(error_pct).rolling(window=window, min_periods=1).mean().values
+        ax.plot(dates_dt, rolling_avg, color='red', linewidth=1.5, label=f'{window}-step rolling avg')
+
+    ax.axhline(y=np.mean(error_pct), color='green', linestyle='--', linewidth=1,
+               label=f'Mean: {np.mean(error_pct):.2f}%')
+
+    ax.set_title(f'{model_name} — Timeline of Error Percentages', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Absolute Percentage Error (%)')
+    ax.legend()
+    ax.grid(alpha=0.3)
+
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    fig.autofmt_xdate()
+
+    plt.tight_layout()
+
+    if save_path:
+        fig.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Figure saved to {save_path}")
+
+    plt.close(fig)
 
 
 def plot_scatter(
@@ -304,7 +489,7 @@ def plot_scatter(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Figure saved to {save_path}")
     
-    plt.show()
+    plt.close()
 
 
 def plot_model_comparison(
@@ -345,7 +530,7 @@ def plot_model_comparison(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Figure saved to {save_path}")
     
-    plt.show()
+    plt.close()
 
 
 def plot_training_curves(
@@ -383,7 +568,7 @@ def plot_training_curves(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Figure saved to {save_path}")
     
-    plt.show()
+    plt.close()
 
 
 def plot_feature_importance(
@@ -420,7 +605,7 @@ def plot_feature_importance(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Figure saved to {save_path}")
     
-    plt.show()
+    plt.close()
 
 
 def generate_all_figures(
@@ -444,58 +629,81 @@ def generate_all_figures(
     
     # Safe model name for filenames
     safe_name = model_name.replace(' ', '_').replace('-', '_').lower()
-    
+
     print(f"\nGenerating figures for {model_name}...")
     print("=" * 50)
-    
-    # 1. Full timeline
+
+    # --- Report Section 6.1 Figures ---
+
+    # (1) Full timeline prediction
     if dates is not None:
         plot_full_timeline(
             dates, actuals, predictions, model_name,
             save_path=os.path.join(output_dir, f'{safe_name}_full_timeline.png')
         )
-    
-    # 2. Last 7 days
-    if dates is not None and len(dates) > 7 * 24:
-        plot_last_n_days(
-            dates, actuals, predictions, 7, model_name,
-            save_path=os.path.join(output_dir, f'{safe_name}_last_7_days.png')
-        )
-    
-    # 3. Last 30 days
-    if dates is not None and len(dates) > 30 * 24:
-        plot_last_n_days(
-            dates, actuals, predictions, 30, model_name,
-            save_path=os.path.join(output_dir, f'{safe_name}_last_30_days.png')
-        )
-    
-    # 4. From 2024 onwards
+
+    # (2) Single prediction window
     if dates is not None:
-        plot_from_2024(
-            dates, actuals, predictions, model_name,
-            save_path=os.path.join(output_dir, f'{safe_name}_from_2024.png')
+        plot_prediction_window(
+            dates, actuals, predictions, window_size=100, model_name=model_name,
+            save_path=os.path.join(output_dir, f'{safe_name}_prediction_window.png')
         )
-    
-    # 5. Error distribution
-    plot_error_distribution(
-        actuals, predictions, model_name,
-        save_path=os.path.join(output_dir, f'{safe_name}_error_dist.png')
-    )
-    
-    # 6. Returns comparison
+
+    # (3) Time series validation windows
+    if dates is not None:
+        plot_validation_windows(
+            dates, actuals, predictions, n_windows=4, model_name=model_name,
+            save_path=os.path.join(output_dir, f'{safe_name}_validation_windows.png')
+        )
+
+    # (4) Returns comparison
     if dates is not None:
         plot_returns_comparison(
             dates, actuals, predictions, model_name,
             save_path=os.path.join(output_dir, f'{safe_name}_returns.png')
         )
-    
-    # 7. Scatter plot
+
+    # (5) Distribution of prediction errors
+    plot_error_distribution(
+        actuals, predictions, model_name,
+        save_path=os.path.join(output_dir, f'{safe_name}_error_dist.png')
+    )
+
+    # (6) Timeline of error percentages
+    if dates is not None:
+        plot_error_percentage_timeline(
+            dates, actuals, predictions, model_name,
+            save_path=os.path.join(output_dir, f'{safe_name}_error_pct_timeline.png')
+        )
+
+    # --- Additional Figures ---
+
+    # Scatter plot (actual vs predicted)
     plot_scatter(
         actuals, predictions, model_name,
         save_path=os.path.join(output_dir, f'{safe_name}_scatter.png')
     )
-    
-    # 8. Training curves (if available)
+
+    # Period-specific analyses
+    if dates is not None and len(dates) > 7 * 24:
+        plot_last_n_days(
+            dates, actuals, predictions, 7, model_name,
+            save_path=os.path.join(output_dir, f'{safe_name}_last_7_days.png')
+        )
+
+    if dates is not None and len(dates) > 30 * 24:
+        plot_last_n_days(
+            dates, actuals, predictions, 30, model_name,
+            save_path=os.path.join(output_dir, f'{safe_name}_last_30_days.png')
+        )
+
+    if dates is not None:
+        plot_from_2024(
+            dates, actuals, predictions, model_name,
+            save_path=os.path.join(output_dir, f'{safe_name}_from_2024.png')
+        )
+
+    # Training curves (if available)
     if 'train_losses' in results:
         plot_training_curves(
             results['train_losses'],
@@ -503,14 +711,14 @@ def generate_all_figures(
             model_name,
             save_path=os.path.join(output_dir, f'{safe_name}_training_curves.png')
         )
-    
-    # 9. Feature importance (if available)
+
+    # Feature importance (if available)
     if 'feature_importance' in results and results['feature_importance'] is not None:
         plot_feature_importance(
             results['feature_importance'], 20, model_name,
             save_path=os.path.join(output_dir, f'{safe_name}_feature_importance.png')
         )
-    
+
     print(f"\nAll figures saved to {output_dir}/")
 
 
