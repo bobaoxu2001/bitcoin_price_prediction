@@ -145,7 +145,7 @@ class SeriesCoreFusion(nn.Module):
         self.series_to_core = nn.Linear(d_model, n_cores)
         
         # Core-to-series projection
-        self.core_to_series = nn.Linear(n_cores * d_model, d_model)
+        self.core_to_series = nn.Linear(d_model, d_model)
         
         # Fusion gate
         self.fusion_gate = nn.Sequential(
