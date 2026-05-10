@@ -1,383 +1,247 @@
-# Predicting the Unpredictable: Deep Learning for Bitcoin Price Dynamics
+# Bitcoin Price Dynamics: A Forecasting & Model-Comparison Study
 
-> **NYU Capstone Project — Group 36**
-> Sam Lai · Zexuan Yang · Yichao Yang · Ao Xu
-
-This project explores the development of deep learning models for Bitcoin price prediction by integrating traditional market data with social media sentiment data. By leveraging advanced time-series forecasting models, this research spans from November 2016 to August 2024, aiming to improve prediction accuracy through innovative feature engineering and hybrid model architectures.
-
----
-
-## Table of Contents
-
-- [Introduction](#introduction)
-- [Dataset Overview](#dataset-overview)
-- [Dataset Sourcing & Collection](#dataset-sourcing--collection)
-- [Data Preprocessing](#data-preprocessing)
-- [Exploratory Analysis](#exploratory-analysis)
-- [Feature Selection](#feature-selection)
-- [Models Implemented](#models-implemented)
-- [Training & Prediction Setup](#training--prediction-setup)
-- [Model Results](#model-results)
-- [Project Structure](#project-structure)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Conclusion & Future Work](#conclusion--future-work)
-- [References](#references)
+> A forecasting and model-comparison study for Bitcoin price dynamics using macro-market and social-sentiment features.
+>
+> **NYU Capstone — Group 36** · Sam Lai · Zexuan Yang · Yichao Yang · Ao Xu · 2024
 
 ---
 
-## Introduction
+## Executive Summary
 
-Cryptocurrency markets exhibit high volatility and complex dynamics, making accurate price prediction a challenging task. This study develops an advanced prediction framework by combining traditional financial indicators (e.g., Nasdaq index, VIX, Gold prices) with social media sentiment metrics. By leveraging state-of-the-art deep learning models, we evaluate their ability to capture market trends over different time horizons.
+This project investigates how well classical statistical models, gradient-boosted trees, and modern deep-learning architectures forecast hourly Bitcoin price dynamics when augmented with macro-market features (Nasdaq, Gold, VIX) and social sentiment (Twitter/X, Reddit, Bitcointalk). We evaluate eight models — ARIMA, XGBoost, LightGBM, SE-GRN, iTransformer, Times-FM, SOFTS, and CNN-LSTM — on ~68k hourly observations from Nov 2016 to Aug 2024.
 
-### Why Bitcoin?
-
-Bitcoin is a digital currency created in 2009 by Satoshi Nakamoto [6]. Its decentralized nature — operating without a central authority — contributes to its high volatility, as its value is subject to rapid changes based on market demand, regulation changes, and external events [1]. Bitcoin's limited supply and extensive discussion on platforms like Google Trends, Twitter, and Reddit make it a prime subject for data-driven price analysis. Our project aims to leverage social media sentiment and market behavior to offer insights into potential price movements.
+The goal is *not* to claim a tradable price-prediction edge. The goal is to compare model families on a noisy, high-volatility asset, study how macro and sentiment features behave, and document the limits of pure price forecasting — which motivates the regime/behavior-focused work in my newer [Digital Asset Market Behavior Intelligence Platform](https://github.com/bobaoxu2001/Digital-Asset-Market-Behavior-Intelligence-Platform).
 
 ---
 
-## Dataset Overview
+## Why This Project Matters
 
-**Time Range:** 2016-11-01 to 2024-08-22 (~68,000 hourly observations)
-
-Our dataset integrates multiple sources to support regression tasks:
-
-### Market Data
-
-| Source | Granularity | Features | Rationale |
-|--------|------------|----------|-----------|
-| **Bitcoin** | Hourly | Closing price (`listing_close`) | Primary prediction target |
-| **NASDAQ Composite** | Daily → Hourly | Open, High, Low, Close/Last | Technology sector correlation with crypto investor profiles |
-| **Gold** | Daily → Hourly | Open, High, Low, Close/Last, Volume | Safe-haven asset; shares scarcity essence with Bitcoin as hedge against inflation |
-| **VIX** | Daily → Hourly | Open, High, Low, Close | Fear gauge for market uncertainty; high VIX correlates with risk-averse behavior |
-
-### Sentiment Data
-
-| Source | Granularity | Features |
-|--------|------------|----------|
-| **Twitter (X)** | Hourly | `twitter_optimistic`, `twitter_negative` + lags (1h, 5h, 12h, 24h) |
-| **Reddit** | Hourly | `reddit_optimistic`, `reddit_negative` + lags (1h, 5h, 12h, 24h) |
-| **Bitcointalk** | Hourly | `bitcointalk_optimistic`, `bitcointalk_negative` + lags (1h, 5h, 12h, 24h) |
-
-### Engineered Features
-
-| Category | Features | Description |
-|----------|----------|-------------|
-| Target | `target_nexthour` | Next-hour Bitcoin price (prediction target) |
-| Returns | `target_log_return`, `percentage_return` | Price return features |
-| Moving Averages | `ma_2`, `ma_6`, `ma_12`, `ma_24` | Trend smoothing at various window sizes |
+- **Bitcoin price formation is multi-factor.** Crypto markets do not move in isolation; they respond to equity-market risk appetite (Nasdaq), safe-haven flows (Gold), implied volatility (VIX), and crowd sentiment. Modeling these together is more honest than treating BTC as a univariate series.
+- **Model choice has real cost.** Bigger and newer is not always better. We show large foundation-style models can underperform a tuned LightGBM on this task — a useful reminder for any quant or ML team picking architectures under deadline.
+- **It exposes the limits of price-only modeling.** Even the best model here only narrows error; none give a stable edge once you account for noise, regime shifts, and the absence of execution costs. That negative result is the single most useful finding for a markets role.
 
 ---
 
-## Dataset Sourcing & Collection
+## Key Findings
 
-The `filtered_df.csv` dataset was assembled from multiple public data sources. Below is a detailed description of how each component was collected and processed.
+1. **Tree-based models are very strong baselines.** LightGBM achieved the lowest MAE (≈254) and XGBoost was close behind. Tuned gradient boosting on hand-engineered features remains a hard benchmark to beat on hourly BTC.
+2. **SOFTS gave the lowest MSE** among tested models (≈183.7k), suggesting it controlled large errors better than the boosted trees, even though its average error (MAE) was higher.
+3. **Larger ≠ better.** Times-FM and CNN-LSTM had the worst MSE despite higher capacity; capacity without inductive bias for this data hurts.
+4. **Sentiment features add information, not magic.** Lagged Reddit/Bitcointalk/Twitter sentiment showed up in feature-importance rankings but did not change the relative model ordering or remove residual noise.
+5. **Macro features matter.** Nasdaq Close/Open and short moving averages (`ma_2`, `ma_6`) consistently rank as top predictors, supporting the well-known crypto–tech-equity correlation.
 
-### 1. Bitcoin Hourly Prices
+---
 
-- **Source:** [CryptoCompare API](https://min-api.cryptocompare.com/) or [CoinGecko API](https://www.coingecko.com/en/api)
-- **Endpoint:** Historical hourly OHLCV data for BTC/USD
-- **Field used:** `listing_close` (hourly closing price)
-- **Range:** 2016-11-01 to 2024-08-22
-- **Collection method:** API calls with pagination to retrieve hourly candles; approximately 68,000 data points
+## Model Comparison Summary
 
-```python
-# Example using CryptoCompare
-import requests
+| Category | Model | MAE | MSE |
+|----------|-------|-----|-----|
+| Baseline | **LightGBM** | **254.37** | 258,918.80 |
+| Baseline | XGBoost | 258.53 | 271,929.61 |
+| Baseline | ARIMA | 1,602.19 | 4,847,913.23 |
+| Proposed | **SOFTS** | 304.23 | **183,679.47** |
+| Proposed | iTransformer | 1,948.00 | 8,123,500.00 |
+| Proposed | CNN-LSTM | 1,941.32 | 6,730,000.00 |
+| Proposed | SE-GRN | 2,377.06 | 883,273.00 |
+| Proposed | Times-FM | 2,672.28 | 3,600,000.00 |
 
-url = "https://min-api.cryptocompare.com/data/v2/histohour"
-params = {"fsym": "BTC", "tsym": "USD", "limit": 2000, "toTs": <end_timestamp>}
-response = requests.get(url, params=params)
+**Headline result:** *LightGBM achieved the lowest MAE, while SOFTS achieved the lowest MSE, suggesting different trade-offs between average error and large-error control.* No single model dominates on both metrics — the right choice depends on whether the downstream use cares more about typical error or tail-error containment.
+
+---
+
+## How This Connects to Digital Asset Market Behavior Analysis
+
+For a digital-asset market-behavior role, this project is best read as foundational research, not a strategy. It demonstrates working knowledge of:
+
+- **Price-movement modeling** on hourly BTC across linear, tree, and neural architectures.
+- **Volatility & correlation analysis** — ACF/PACF, time-varying NASDAQ–BTC correlation (notable break during COVID-19), heteroscedasticity.
+- **Macro risk proxy engineering** — Nasdaq, Gold, VIX aligned to a crypto-native frequency.
+- **Sentiment feature engineering** — multi-platform optimistic/negative scores with 1h/5h/12h/24h lags.
+- **Disciplined model comparison** — chronological splits (no leakage), MAE *and* MSE reported, walk-forward where applicable.
+- **Honest negative results** — documenting that pure price prediction is fragile motivates the shift toward regime classification, event studies, and behavior analytics.
+
+---
+
+## Relevance to Digital Asset Market Behavior & Strategy
+
+Mapping this project to a digital-asset market-behavior & strategy analyst remit:
+
+| Analyst lens | What this repo demonstrates |
+|---|---|
+| Price-movement analysis | Hourly BTC modeling across 8 architectures with disciplined splits |
+| Volatility analysis | ACF/PACF, time-varying volatility, heteroscedasticity, structural-break inspection |
+| Sentiment feature engineering | Multi-platform sentiment with multi-lag features |
+| Macro risk proxies | VIX (fear), Nasdaq (risk appetite), Gold (safe-haven) integrated into the feature set |
+| Model comparison | Honest MAE/MSE table; explicit "best on what metric" framing |
+| Limits of prediction | Negative result: pure price prediction is fragile — motivates regime/behavior framing |
+
+---
+
+## Relationship to the Digital Asset Market Behavior Intelligence Platform
+
+This is a **companion / earlier research project**. My main project for digital-asset market-behavior work is the
+[Digital Asset Market Behavior Intelligence Platform](https://github.com/bobaoxu2001/Digital-Asset-Market-Behavior-Intelligence-Platform), which deliberately moves *past* price prediction and covers the pieces missing here:
+
+| Missing here | Covered in the newer platform |
+|---|---|
+| No on-chain activity / wallet clustering | Native on-chain metrics and flow analysis |
+| No DeFi liquidity view | DEX / liquidity-pool depth and TVL signals |
+| No event studies | Pre/post-event abnormal-return analysis |
+| No regime classification | Volatility/correlation regime tagging |
+| Pure-prediction framing | Behavior-, regime-, and strategy-insight framing |
+| No exchange flow data | CEX flow and stablecoin proxies |
+
+Read this repo as the "what I learned trying to predict BTC directly" prerequisite to that platform.
+
+---
+
+## Limitations
+
+- **Bitcoin price prediction is intrinsically noisy.** Reported MAE/MSE are point-forecast accuracy on a single test window; they are *not* a trading-strategy P&L.
+- **No transaction costs, slippage, fees, or borrow costs** are modeled. Translating any of these errors into a strategy would require execution modeling.
+- **Sentiment data is noisy and platform-dependent.** Bot activity, sampling differences across Twitter / Reddit / Bitcointalk, and labeler variance (VADER vs. CryptoBERT) all bias the signal; we did not adversarially audit the sentiment pipeline.
+- **No on-chain or exchange-flow data.** Wallet clustering, miner flows, stablecoin supply, CEX inflows/outflows are absent — exactly the data a behavior-focused analyst would want.
+- **One test regime.** Test period is Jan–Aug 2024; results may not generalize to later regimes.
+- **Historical performance does not guarantee future performance.**
+- **This project is research and educational.** It is **not financial advice**, and nothing here should be used as a basis for live trading.
+
+---
+
+## How to Run
+
+```bash
+# 1. Install
+pip install -r requirements.txt
+# CPU-only PyTorch:
+# pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# 2. Get data
+# `filtered_df.csv` is not committed (~68k rows). Either:
+#   (a) Build it from sources (see Dataset Overview below + data_collection.py), or
+#   (b) Generate a small synthetic dataset for code testing:
+python3 data_collection.py     # writes a synthetic filtered_df.csv
+
+# 3. Run a single model (fastest first)
+python3 lightgbm_model.py
+python3 xgboost_model.py
+
+# 4. Run everything (slow on CPU)
+python3 run_all_models.py
 ```
 
-### 2. NASDAQ Composite Index (Daily)
-
-- **Source:** [Yahoo Finance](https://finance.yahoo.com/quote/%5EIXIC/) (ticker: `^IXIC`) or [NASDAQ official data](https://www.nasdaq.com/market-activity/index/comp/historical)
-- **Fields:** Open, High, Low, Close/Last (mapped to `NasOpen`, `NasHigh`, `NasLow`, `NasClose/Last`)
-- **Alignment:** Daily data forward-filled to hourly frequency
-
-### 3. Gold Prices (Daily)
-
-- **Source:** [Yahoo Finance](https://finance.yahoo.com/quote/GC%3DF/) (Gold Futures ticker: `GC=F`) or [Investing.com Gold Historical Data](https://www.investing.com/commodities/gold-historical-data)
-- **Fields:** Open, High, Low, Close/Last, Volume (mapped to `GOpen`, `GHigh`, `GLow`, `GClose/Last`, `GVolume`)
-- **Alignment:** Daily data forward-filled to hourly frequency
-
-### 4. VIX Index (Daily)
-
-- **Source:** [Yahoo Finance](https://finance.yahoo.com/quote/%5EVIX/) (ticker: `^VIX`) or [CBOE VIX Data](https://www.cboe.com/tradable_products/vix/)
-- **Fields:** Open, High, Low, Close (mapped to `OPEN`, `HIGH`, `LOW`, `CLOSE`)
-- **Alignment:** Daily data forward-filled to hourly frequency
-
-### 5. Social Media Sentiment (Hourly)
-
-Sentiment scores were collected from three cryptocurrency-focused platforms and aggregated to hourly granularity:
-
-- **Twitter (X):** Cryptocurrency-related tweets were collected using the Twitter API (Academic Research access) or tools like [snscrape](https://github.com/JustAnotherArchiworker/snscrape). Sentiment was scored using [VADER](https://github.com/cjhutto/vaderSentiment) or [CryptoBERT](https://huggingface.co/ElKulako/cryptobert), then aggregated into hourly `twitter_optimistic` and `twitter_negative` scores.
-- **Reddit:** Posts and comments from subreddits such as r/Bitcoin and r/CryptoCurrency were collected using [PRAW](https://praw.readthedocs.io/) (Python Reddit API Wrapper). Sentiment was similarly scored and aggregated hourly.
-- **Bitcointalk:** Posts from the [Bitcointalk forum](https://bitcointalk.org/) were scraped and sentiment-analyzed, producing hourly `bitcointalk_optimistic` and `bitcointalk_negative` scores.
-
-**Lag features** (1-hour, 5-hour, 12-hour, 24-hour) were created for all sentiment columns to capture delayed market reactions.
-
-### Data Assembly Pipeline
-
-```
-Bitcoin hourly prices ──┐
-NASDAQ daily OHLCV ─────┤  forward-fill to hourly
-Gold daily OHLCV ───────┤──────────────────────────→ merge on datetime → filtered_df.csv
-VIX daily ──────────────┤
-Sentiment hourly ───────┘  + lag features + moving averages
-```
-
-See `data_collection.py` for a reference implementation of this pipeline.
-
----
-
-## Data Preprocessing
-
-- **Daily-to-Hourly Alignment:** Market indicators (NASDAQ, Gold, VIX) are forward-filled from daily to hourly frequency.
-- **Missing Values:** Forward-fill then backward-fill strategy (weekends, holidays, gaps from moving averages).
-- **Normalization:** StandardScaler applied to features and targets.
-- **Train/Test Split:** Chronological split — no random shuffling to prevent data leakage.
-
-See `data_preprocessing.py` for implementation.
-
----
-
-## Exploratory Analysis
-
-Exploratory analysis was performed to guide feature engineering and model selection:
-
-1. **Correlation Analysis:** Heatmap revealing strong positive correlations (~0.92) between `listing_close` and NASDAQ metrics. Negative sentiment shows mild-to-moderate negative correlations with Bitcoin prices.
-2. **Time-Varying Correlation:** Dynamic correlation between NASDAQ and Bitcoin shows structural changes (e.g., sharp dip during COVID-19 in 2020).
-3. **ACF and PACF Analysis:** Slow decay in ACF and sharp cutoff at lag 1 in PACF suggests ARIMA(1,1,1) as a reasonable statistical baseline.
-4. **Volatility Analysis:** Time-varying volatility analysis identifies heteroscedasticity, structural breaks, and regime changes.
-
-See `eda_analysis.py` for implementation.
-
----
-
-## Feature Selection
-
-Feature selection was performed using **LightGBM** and **XGBoost**, leveraging gain-based metrics to identify the most influential predictors:
-
-**Key Features Identified:**
-- **NASDAQ Features:** Close/Last, Open, High, Low, and short-term moving averages (ma_2, ma_6)
-- **Hourly Lagged Sentiment:** Historical optimistic and negative sentiment from Bitcointalk, Reddit, and Twitter at 1-hour, 5-hour, 12-hour, and 24-hour lags
-
-See `feature_selection.py` for implementation.
-
----
-
-## Models Implemented
-
-### Baseline Models
-
-| Model | File | Description |
-|-------|------|-------------|
-| **ARIMA** | `arima_model.py` | Classical statistical model with auto-order selection via `pmdarima`. Walk-forward validation. |
-| **XGBoost** | `xgboost_model.py` | Gradient boosting with decision trees. Early stopping, L1/L2 regularization, feature importance analysis. |
-| **LightGBM** | `lightgbm_model.py` | Histogram-based gradient boosting optimized for speed/memory. Leaf-wise tree growth. |
-
-### Proposed Deep Learning Models
-
-| Model | File | Description | Reference |
-|-------|------|-------------|-----------|
-| **SE-GRN** | `se_grn_model.py` | Squeeze-and-Excitation Gated Recurrent Network. Combines GRU layers with SE blocks for dynamic feature recalibration; attention mechanism for temporal dependencies. | Zhang et al. [8] |
-| **iTransformer** | `itransformer_model.py` | Inverted Transformer embedding each time point as an independent variable token. Improves multivariate correlation modeling. | Liu et al., 2023 [5] |
-| **Times-FM** | `times_fm_model.py` | Architecture inspired by Google's 200M-parameter Time-Series Foundation Model. Patch-based tokenization with decoder-only design and causal attention. | Das et al., 2024 [2] |
-| **SOFTS** | `softs_model.py` | Series-cOre Fused Time Series forecasting. Series-core fusion mechanism for inter-series relationships with temporal convolution. | Han et al., 2024 [4] |
-| **CNN-LSTM** | `cnn_lstm_model.py` | Hybrid architecture: multi-scale CNN for feature extraction + bidirectional LSTM for temporal dependencies + attention mechanism. | Shi et al., 2015 [7] |
-
----
-
-## Training & Prediction Setup
-
-- **Training data:** 62,809 time points (period prior to 2024-01-01)
-- **Test data:** Remaining observations (2024-01-01 to 2024-08-22)
-- **Prediction horizon:** Next 100 time steps (both price and returns)
-- **Sequence length:** 100 hours (~4 days) for deep learning models
-- **Batch size:** 32
-- **Early stopping patience:** 15 epochs
-- **Validation:** 10% of training data held out for validation
-
----
-
-## Model Results
-
-### Table 1: Performance of Models in Price Prediction (MAE and MSE)
-
-| Model Category | Model | MAE | MSE |
-|---------------|-------|-----|-----|
-| **Baseline** | LightGBM | 254.37 | 258,918.80 |
-| **Baseline** | ARIMA | 1,602.19 | 4,847,913.23 |
-| **Baseline** | XGBoost | 258.53 | 271,929.61 |
-| **Proposed** | SE-GRN | 2,377.06 | 883,273.00 |
-| **Proposed** | iTransformer | 1,948.00 | 8,123,500.00 |
-| **Proposed** | Times-FM | 2,672.28 | 3,600,000.00 |
-| **Proposed** | SOFTS | **304.23** | **183,679.47** |
-| **Proposed** | CNN-LSTM | 1,941.32 | 6,730,000.00 |
-
-**Best Model:** SOFTS achieved the best performance among proposed models, with MAE of 304.23 and MSE of 183,679.47, outperforming all baseline and deep learning models through its series-core fusion mechanism.
-
-### Visualization Components
-
-The following visualizations are generated for each model (see Section 6.1 of the paper):
-1. **Full timeline prediction** — complete prediction period
-2. **Single prediction window** — short-term accuracy
-3. **Time series validation windows** — robustness trends
-4. **Returns comparison** — actual vs predicted daily returns
-5. **Distribution of prediction errors** — error variability
-6. **Timeline of error percentages** — error fluctuation over time
+Outputs land in `figures/` and `results/` (gitignored).
 
 ---
 
 ## Project Structure
 
 ```
-project_folder/
-├── filtered_df.csv              # Preprocessed dataset (not in repo — see Dataset Sourcing)
-├── requirements.txt             # Python dependencies
-├── data_collection.py           # Dataset collection & assembly reference pipeline
-├── data_preprocessing.py        # Data loading, cleaning, scaling, and sequence creation
-├── eda_analysis.py              # Exploratory data analysis (correlation, ACF/PACF, volatility)
-├── feature_selection.py         # Feature selection using LightGBM/XGBoost importance
-├── arima_model.py               # ARIMA baseline model
-├── xgboost_model.py             # XGBoost baseline model
-├── lightgbm_model.py            # LightGBM baseline model
-├── se_grn_model.py              # SE-GRN deep learning model
-├── itransformer_model.py        # iTransformer model
-├── times_fm_model.py            # Times-FM inspired model
-├── softs_model.py               # SOFTS model
-├── cnn_lstm_model.py            # CNN-LSTM hybrid model
-├── visualization.py             # Visualization utilities for all figure types
-├── run_all_models.py            # Master script to run all models and generate figures
-├── README.md                    # This documentation
-├── AGENTS.md                    # Development environment notes
-└── capstone1006_Group36.pdf     # Original capstone report
+bitcoin_price_prediction/
+├── README.md                    # This file
+├── AGENTS.md                    # Dev environment notes
+├── capstone1006_Group36.pdf     # Original capstone report
+├── requirements.txt
+├── docs/
+│   ├── project_summary.md       # 1-page overview
+│   ├── model_results.md         # Full results table + interpretation
+│   └── interview_talking_points.md
+├── data_collection.py           # Source pipeline + synthetic-data fallback
+├── data_preprocessing.py        # Loading, cleaning, scaling, sequence creation
+├── eda_analysis.py              # Correlation, ACF/PACF, volatility analysis
+├── feature_selection.py         # LightGBM/XGBoost feature importance
+├── visualization.py             # Plotting utilities
+├── run_all_models.py            # Master script
+├── arima_model.py               # Statistical baseline
+├── xgboost_model.py             # Boosted-tree baseline
+├── lightgbm_model.py            # Boosted-tree baseline (best MAE)
+├── se_grn_model.py              # Squeeze-Excitation GRU
+├── itransformer_model.py        # Inverted Transformer
+├── times_fm_model.py            # Times-FM-style decoder
+├── softs_model.py               # Series-cOre Fused TS (best MSE)
+└── cnn_lstm_model.py            # CNN + BiLSTM + attention
 ```
 
 ---
 
-## Installation
+## Dataset Overview
 
-### Requirements
+**Time range:** 2016-11-01 → 2024-08-22 (~68,000 hourly rows).
 
-```bash
-pip install -r requirements.txt
-```
+**Sources & features:**
 
-Or install manually:
+| Group | Source | Features |
+|---|---|---|
+| Target | CryptoCompare / CoinGecko | `listing_close` (hourly BTC close) |
+| Macro | Yahoo Finance ^IXIC | NASDAQ OHLC (daily → hourly forward-fill) |
+| Macro | Yahoo Finance GC=F | Gold OHLCV (daily → hourly forward-fill) |
+| Macro | Yahoo Finance ^VIX | VIX OHLC (daily → hourly forward-fill) |
+| Sentiment | Twitter/X (snscrape / API) | `twitter_optimistic`, `twitter_negative` + 1h/5h/12h/24h lags |
+| Sentiment | Reddit (PRAW) | `reddit_*` + same lags |
+| Sentiment | Bitcointalk (scrape) | `bitcointalk_*` + same lags |
+| Engineered | — | `target_nexthour`, `target_log_return`, `percentage_return`, `ma_2/6/12/24` |
 
-```bash
-# Core dependencies
-pip install numpy pandas scikit-learn torch matplotlib seaborn
-
-# ML/Statistical models
-pip install xgboost lightgbm pmdarima statsmodels arch
-
-# Optional (interactive visualization)
-pip install plotly
-```
-
-> **Note:** For CPU-only environments, install PyTorch with:
-> ```bash
-> pip install torch --index-url https://download.pytorch.org/whl/cpu
-> ```
+**Preprocessing:** chronological train/test split (no shuffling), forward-fill then backward-fill for gaps, StandardScaler. See `data_preprocessing.py`.
 
 ---
 
-## Usage
+## Models Implemented
 
-### Run Individual Models
+### Baselines
+| Model | File | Note |
+|---|---|---|
+| ARIMA | `arima_model.py` | `pmdarima` auto-order, walk-forward |
+| XGBoost | `xgboost_model.py` | Early stopping, L1/L2 regularization |
+| LightGBM | `lightgbm_model.py` | Histogram-based, leaf-wise growth — **best MAE** |
 
-```bash
-# Baseline models
-python arima_model.py
-python xgboost_model.py
-python lightgbm_model.py
-
-# Deep learning models
-python se_grn_model.py
-python itransformer_model.py
-python times_fm_model.py
-python softs_model.py
-python cnn_lstm_model.py
-```
-
-### Run All Models
-
-```bash
-python run_all_models.py
-```
-
-This runs all 8 models, generates comparison figures, and saves results to `figures/` and `results/`.
-
-### Exploratory Analysis
-
-```bash
-python eda_analysis.py
-```
-
-### Feature Selection Analysis
-
-```bash
-python feature_selection.py
-```
-
-### Custom Usage
-
-```python
-from data_preprocessing import BitcoinDataLoader, DataPreprocessor, calculate_metrics
-from softs_model import run_softs_experiment
-
-results = run_softs_experiment(
-    data_path='filtered_df.csv',
-    epochs=50,
-    batch_size=32,
-    learning_rate=0.001
-)
-
-print(f"MAE: {results['metrics']['MAE']:.4f}")
-print(f"MSE: {results['metrics']['MSE']:.4f}")
-```
+### Proposed deep models
+| Model | File | Note | Reference |
+|---|---|---|---|
+| SE-GRN | `se_grn_model.py` | GRU + Squeeze-Excitation + attention | Zhang et al. |
+| iTransformer | `itransformer_model.py` | Inverted Transformer for multivariate TS | Liu et al., 2023 |
+| Times-FM | `times_fm_model.py` | Decoder-only patch tokenization, FM-inspired | Das et al., 2024 |
+| SOFTS | `softs_model.py` | Series-cOre Fused TS — **best MSE** | Han et al., 2024 |
+| CNN-LSTM | `cnn_lstm_model.py` | Multi-scale CNN + BiLSTM + attention | Shi et al., 2015 |
 
 ---
 
-## Conclusion & Future Work
+## Training Setup
 
-The SOFTS model demonstrated superior predictive accuracy and stability through its series-core fusion mechanism, outperforming baseline models and advanced deep learning architectures like SE-GRN and CNN-LSTM. Notably, Times-FM, despite its large parameter size, performed poorly, revealing that model complexity does not guarantee improved predictions.
+- Train: 62,809 rows (pre-2024-01-01) · Test: 2024-01-01 → 2024-08-22
+- Sequence length 100h (~4 days), batch 32, early stopping patience 15
+- 10% of train held out for validation
 
-**Key Insights:**
-1. Specialized architectures with effective feature fusion outperform general models.
-2. Social media sentiment contributes meaningfully to price dynamics when combined with market indicators.
-3. Model simplicity and interpretability are often more valuable than sheer complexity in financial forecasting.
+---
 
-**Future Work:**
-- Acquiring updated, real-time datasets to analyze event-driven market shifts (e.g., elections, policy changes).
-- Expanding to include alternative data sources: news headlines, blockchain activity, real-time social media trends.
+## Future Work
+
+- Update test window beyond 2024-08 to assess regime stability.
+- Replace the pure price target with regime / volatility-bucket classification.
+- Add on-chain features (active addresses, exchange netflow, stablecoin supply).
+- Move from accuracy metrics to strategy metrics (Sharpe, max drawdown) with realistic cost modeling.
+
+These directions are pursued in the [Digital Asset Market Behavior Intelligence Platform](https://github.com/bobaoxu2001/Digital-Asset-Market-Behavior-Intelligence-Platform).
 
 ---
 
 ## References
 
-1. David Lee Kuo Chuen. *Handbook of Digital Currency: Bitcoin, Innovation, Financial Instruments, and Big Data.* Academic Press, 1st edition, 2015.
-2. A. Das, W. Kong, R. Sen, Y. Zhou, and Google Research. "A decoder-only foundation model for time-series forecasting." *ICML 2024*, 2024.
-3. Google. "Google Trends." https://trends.google.com/, 2024.
-4. L. Han, X.-Y. Chen, H.-J. Ye, D.-C. Zhan. "SOFTS: Efficient multivariate time series forecasting with series-core fusion." *NeurIPS 2024*, 2024.
-5. Yong Liu, Tengge Hu, Haoran Zhang, Haixu Wu, Shiyu Wang, Lintao Ma, and Mingsheng Long. "iTransformer: Inverted transformers are effective for time series forecasting." *arXiv:2310.06625*, 2023.
-6. Satoshi Nakamoto. "Bitcoin: A peer-to-peer electronic cash system." https://bitcoin.org/bitcoin.pdf, 2008.
-7. Xingjian Shi, Zhourong Chen, Hao Wang, Dit-Yan Yeung, Wai-Kin Wong, and Wang-chun Woo. "Convolutional LSTM network: A machine learning approach for precipitation nowcasting." *Advances in Neural Information Processing Systems*, 28, 2015.
-8. Jiawei Zhang, Limeng Cui, and Fisher B. Gouza. "SeGen: Sample-ensemble genetic evolutional network model." *arXiv:1803.08631*, 2018.
+1. David Lee Kuo Chuen. *Handbook of Digital Currency.* Academic Press, 2015.
+2. A. Das, W. Kong, R. Sen, Y. Zhou. "A decoder-only foundation model for time-series forecasting." *ICML 2024.*
+3. L. Han, X.-Y. Chen, H.-J. Ye, D.-C. Zhan. "SOFTS: Efficient multivariate time series forecasting with series-core fusion." *NeurIPS 2024.*
+4. Yong Liu et al. "iTransformer: Inverted transformers are effective for time series forecasting." *arXiv:2310.06625*, 2023.
+5. Satoshi Nakamoto. "Bitcoin: A peer-to-peer electronic cash system." 2008.
+6. Xingjian Shi et al. "Convolutional LSTM network: A machine learning approach for precipitation nowcasting." *NeurIPS*, 2015.
+7. Jiawei Zhang, Limeng Cui, Fisher B. Gouza. "SeGen: Sample-ensemble genetic evolutional network model." *arXiv:1803.08631*, 2018.
 
 ---
 
 ## Authors
 
-| Name | Email | Affiliation |
-|------|-------|-------------|
-| Sam Lai | jl12560@nyu.edu | New York University |
-| Zexuan Yang | zy3035@nyu.edu | New York University |
-| Yichao Yang | yy5020@nyu.edu | New York University |
-| Ao Xu | ax2183@nyu.edu | New York University |
+| Name | Email |
+|---|---|
+| Sam Lai | jl12560@nyu.edu |
+| Zexuan Yang | zy3035@nyu.edu |
+| Yichao Yang | yy5020@nyu.edu |
+| Ao Xu | ax2183@nyu.edu |
 
-*Data Science & Machine Learning Capstone Project, 2024*
+> **Disclaimer:** Research and educational project. Not financial advice. Not a trading strategy.
